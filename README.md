@@ -1,6 +1,6 @@
 # CareerGuide GPT (Streamlit + LangChain + Gemini + Supabase)
 
-A ChatGPT-like career guidance app with:
+Remiro AI , A vishcraft Product :
 - Chat interface in the main area
 - Chat sessions history in the left sidebar
 - Gemini model via LangChain
