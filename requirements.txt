@@ -4,3 +4,7 @@ langchain-google-genai>=2.0.0
 supabase>=2.8.0
 python-dotenv>=1.0.1
 langchain-experimental
+fastapi>=0.115.0
+uvicorn>=0.30.0
+pymongo>=4.8.0
+PyJWT>=2.9.0

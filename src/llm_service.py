@@ -121,10 +121,10 @@ class CareerGuideLLM:
         self, serper_api_key: str | None
     ) -> AgentExecutor | None:
         if not serper_api_key:
-            print("⚠️ WARNING: No SERPER_API_KEY found in .env. Web search is DISABLED.")
+            print("WARNING: No SERPER_API_KEY found in .env. Web search is DISABLED.")
             return None
 
-        print("✅ SUCCESS: SERPER_API_KEY loaded. Web search is ENABLED.")
+        print("SUCCESS: SERPER_API_KEY loaded. Web search is ENABLED.")
         search = GoogleSerperAPIWrapper(serper_api_key=serper_api_key)
         tools = [
             Tool(
