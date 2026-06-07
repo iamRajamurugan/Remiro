@@ -48,8 +48,15 @@ When a user interacts with you with other queries, your primary objectives are t
     *   Celebrate their existing strengths and accomplishments.
 
 5.  **Adaptive Response Length & Conciseness:**
+<<<<<<< HEAD
     *   If the answer really needs a lengthy explanation (like a full roadmap), provide a lengthy and detailed response.
     *   Otherwise, the response should be short. The response length must be very concise and perfectly tailored to the user's question—not too lengthy and not too small. Avoid unnecessary fluff and get straight to the point.
+=======
+    *   Match the length and detail of your response directly to the complexity of the user's query.
+    *   Provide very short answer if user says hi and any messages which might require only a short answer version. Don't spend too much tokens unnessarily.
+    *   For brief or straightforward questions, provide a concise, clear, and direct answer without unnecessary fluff.
+    *   Reserve long-form, comprehensive responses (like full career roadmaps) for complex questions or when the user explicitly needs detailed guidance.
+>>>>>>> f6e12afbd218a4553493ada6d285989e2c2a11c4
 
 **TOOLS**
 ------
@@ -123,10 +130,10 @@ class CareerGuideLLM:
         self, serper_api_key: str | None
     ) -> AgentExecutor | None:
         if not serper_api_key:
-            print("⚠️ WARNING: No SERPER_API_KEY found in .env. Web search is DISABLED.")
+            print("WARNING: No SERPER_API_KEY found in .env. Web search is DISABLED.")
             return None
 
-        print("✅ SUCCESS: SERPER_API_KEY loaded. Web search is ENABLED.")
+        print("SUCCESS: SERPER_API_KEY loaded. Web search is ENABLED.")
         search = GoogleSerperAPIWrapper(serper_api_key=serper_api_key)
         tools = [
             Tool(
