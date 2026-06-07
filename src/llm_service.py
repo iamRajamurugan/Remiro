@@ -8,6 +8,10 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import PromptTemplate
 from langchain_core.tools import Tool
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.callbacks import BaseCallbackHandler
+from queue import Queue
+from threading import Thread
+from typing import Generator
 
 
 # The original system prompt is now part of the agent's prompt template
@@ -42,6 +46,10 @@ When a user interacts with you with other queries, your primary objectives are t
     *   Always be positive, empathetic, and encouraging.
     *   Frame your advice in a way that empowers the user and builds their confidence.
     *   Celebrate their existing strengths and accomplishments.
+
+5.  **Adaptive Response Length & Conciseness:**
+    *   If the answer really needs a lengthy explanation (like a full roadmap), provide a lengthy and detailed response.
+    *   Otherwise, the response should be short. The response length must be very concise and perfectly tailored to the user's question—not too lengthy and not too small. Avoid unnecessary fluff and get straight to the point.
 
 **TOOLS**
 ------
@@ -164,6 +172,98 @@ class CareerGuideLLM:
             print(f"Agent execution failed: {e}")
             # Fallback to the non-agent implementation in case of agent error
             return self._generate_reply_no_agent(history)
+
+    def stream_reply(self, history: list[dict[str, Any]]) -> Generator[str, None, None]:
+        if not self.agent_executor:
+            # Fallback to normal string (but yield it once so write_stream works)
+            yield self._generate_reply_no_agent(history)
+            return
+
+        chat_history = []
+        for msg in history[:-1]:
+            role = (msg.get("role") or "").strip().lower()
+            content = (msg.get("content") or "").strip()
+            if not content:
+                continue
+            if role == "assistant":
+                chat_history.append(AIMessage(content=content))
+            elif role == "user":
+                chat_history.append(HumanMessage(content=content))
+
+        user_input = (history[-1].get("content") or "").strip()
+
+        # Enable streaming temporarily
+        original_streaming = getattr(self.model, "streaming", False)
+        self.model.streaming = True
+
+        q = Queue()
+
+        class FinalAnswerCallback(BaseCallbackHandler):
+            def __init__(self, q: Queue):
+                self.q = q
+                self.buffer = ""
+                self.final_answer_started = False
+            
+            def on_llm_start(self, serialized: dict[str, Any], prompts: list[str], **kwargs: Any) -> Any:
+                self.buffer = ""
+                self.final_answer_started = False
+
+            def on_llm_new_token(self, token: Any, **kwargs: Any) -> None:
+                # Handle non-string tokens (e.g. from structured output models)
+                if not isinstance(token, str):
+                    if isinstance(token, list):
+                        # Attempt to extract text from a list of dicts (common in some model outputs)
+                        token = "".join([t.get("text", str(t)) if isinstance(t, dict) else str(t) for t in token])
+                    else:
+                        token = str(token)
+
+                if self.final_answer_started:
+                    self.q.put(token)
+                else:
+                    self.buffer += token
+                    if "Final Answer:" in self.buffer:
+                        self.final_answer_started = True
+                        idx = self.buffer.find("Final Answer:") + len("Final Answer:")
+                        rest = self.buffer[idx:]
+                        if rest.startswith(" "):
+                            rest = rest[1:]
+                        if rest:
+                            self.q.put(rest)
+            
+            def on_tool_end(self, output: str, **kwargs: Any) -> Any:
+                self.buffer = ""
+                self.final_answer_started = False
+
+            def on_agent_finish(self, finish: Any, **kwargs: Any) -> Any:
+                self.q.put(None)
+                
+            def on_agent_action(self, action: Any, **kwargs: Any) -> Any:
+                pass
+
+        cb = FinalAnswerCallback(q)
+
+        def run_agent():
+            try:
+                self.agent_executor.invoke(
+                    {"input": user_input, "chat_history": chat_history},
+                    config={"callbacks": [cb]}
+                )
+            except Exception as e:
+                print(f"Agent execution failed in stream: {e}")
+            finally:
+                q.put(None)
+
+        t = Thread(target=run_agent)
+        t.start()
+
+        while True:
+            token = q.get()
+            if token is None:
+                # Agent finished
+                break
+            yield token
+            
+        self.model.streaming = original_streaming
 
     def _generate_reply_no_agent(self, history: list[dict[str, Any]]) -> str:
         """The original implementation without web search capabilities."""

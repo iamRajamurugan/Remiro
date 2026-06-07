@@ -223,9 +223,12 @@ def main() -> None:
     updated_history = repo.get_messages(selected_session_id)
 
     with st.chat_message("assistant"):
-        with st.spinner("Thinking..."):
-            reply = llm.generate_reply(updated_history)
-            st.markdown(reply)
+        if hasattr(llm, "stream_reply") and llm.agent_executor is not None:
+            reply = st.write_stream(llm.stream_reply(updated_history))
+        else:
+            with st.spinner("Thinking..."):
+                reply = llm.generate_reply(updated_history)
+                st.markdown(reply)
 
     repo.add_message(selected_session_id, "assistant", reply)
     st.rerun()
